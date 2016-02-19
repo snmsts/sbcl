@@ -1,0 +1,26 @@
+language: common-lisp
+sudo: required
+env:
+  global:
+    - PATH=~/.roswell/bin:$PATH
+    - ROSWELL_BRANCH=master
+    - ROSWELL_INSTALL_DIR=$HOME/.roswell
+  matrix:
+    - LISP=sbcl-bin
+os:
+  - osx
+  - linux
+
+before_install:
+  - date
+  - if [ $TRAVIS_OS_NAME = linux ]; then sudo apt-get -qq update --force-yes > /dev/null; fi
+  - if [ $TRAVIS_OS_NAME = osx ]; then brew update;brew --env;brew config; fi
+
+script:
+  - curl -L https://raw.githubusercontent.com/snmsts/roswell/release/scripts/install-for-ci.sh | sh
+  - ros version
+  - ros version=t run
+  - ros config
+  - echo '"1.0.99.999"' > version.lisp-expr
+  - sh make.sh --xc-host='ros run'
+  - cd tests && sh ./run-tests.sh
