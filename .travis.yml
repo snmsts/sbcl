@@ -24,5 +24,7 @@ script:
   - ros version=t run
   - ros config
   - echo '"1.0.99.999"' > version.lisp-expr
-  - sh make.sh --xc-host='ros run'
+  - sh make.sh --xc-host='ros run' > /dev/null
+
+after_success:
   - cd tests && sh ./run-tests.sh
