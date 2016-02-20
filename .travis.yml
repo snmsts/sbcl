@@ -8,6 +8,7 @@ env:
   matrix:
     - LISP=sbcl-bin
     - LISP=ccl
+    - LISP=clisp
 
 os:
   - osx
@@ -19,7 +20,7 @@ before_install:
   - if [ $TRAVIS_OS_NAME = osx ]; then brew update;brew --env;brew config; fi
 
 script:
-  - curl -L https://raw.githubusercontent.com/snmsts/roswell/release/scripts/install-for-ci.sh | sh
+  - curl -L https://raw.githubusercontent.com/snmsts/roswell/release/scripts/install-for-ci.sh | sh > /dev/null
   - ros version
   - ros version=t run
   - ros config
@@ -27,4 +28,4 @@ script:
   - sh make.sh --xc-host='ros run' > /dev/null
 
 after_success:
-  - cd tests && sh ./run-tests.sh
+  - cd tests && sh ./run-tests.sh 2>/dev/null
