@@ -520,6 +520,20 @@ void* new_thread_trampoline(void* arg)
 #else
 #define SCRIBBLE 0
 #endif
+#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_X86)
+    /* 32-bit Windows delivers exceptions only through the frame-based SEH
+     * chain (x86-64 and arm64 use a vectored handler instead). call_into_lisp
+     * establishes a frame for the duration of the Lisp call, but the runtime
+     * code around it also faults on purpose: push_gcing_safety() at the end of
+     * init_new_thread() stores to the csp page, which is protected while a GC
+     * is in progress, and expects handle_exception() to run
+     * thread_in_safety_transition(). Without a frame that fault is fatal to the
+     * process. Cover the whole trampoline, as initialize_lisp() does for the
+     * main thread. */
+    struct lisp_exception_frame exception_frame;
+    exception_frame.bindstack_pointer = th->binding_stack_pointer;
+    wos_install_interrupt_handlers(&exception_frame);
+#endif
     // 'th->lisp_thread' remains valid despite not being in all_threads
     // due to the pinning via *STARTING-THREADS*.
     struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
@@ -568,6 +582,9 @@ void* new_thread_trampoline(void* arg)
     funcall1(startfun, (lispobj)lispthread); // both pinned
     // Close the GC region and unlink from all_threads
     unregister_thread(th, SCRIBBLE);
+#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_X86)
+    wos_uninstall_interrupt_handlers(&exception_frame);
+#endif
 
     return 0;
 }

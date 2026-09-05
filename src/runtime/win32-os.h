@@ -73,6 +73,7 @@ struct lisp_exception_frame {
 };
 
 void wos_install_interrupt_handlers(struct lisp_exception_frame *handler);
+void wos_uninstall_interrupt_handlers(struct lisp_exception_frame *handler);
 char *dirname(char *path);
 
 bool win32_maybe_interrupt_io(void* thread);

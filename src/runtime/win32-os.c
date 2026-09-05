@@ -1264,6 +1264,16 @@ wos_install_interrupt_handlers
 #endif
 }
 
+void
+wos_uninstall_interrupt_handlers
+(struct lisp_exception_frame __attribute__((__unused__)) *handler)
+{
+#ifdef LISP_FEATURE_X86
+    gc_assert(get_seh_frame() == handler);
+    set_seh_frame(handler->next_frame);
+#endif
+}
+
 char *dirname(char *path)
 {
     static char buf[PATH_MAX + 1];

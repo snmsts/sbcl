@@ -51,6 +51,19 @@ int arch_os_thread_init(struct thread *thread)
         asm volatile ("movl %%fs:0,%0": "=r" (top_exception_frame));
         asm volatile ("movl %%fs:4,%0": "=r" (cur_stack_end));
 
+        /* new_thread_trampoline (and initialize_lisp for the main thread)
+         * establish an SEH frame of their own before getting here. That
+         * frame is a local of a function whose other locals may lie above
+         * it, and csp_around_foreign_call (which must satisfy
+         * assert_on_stack) is the address of one of them. Look past it to
+         * the frame established by the OS. */
+        {
+            extern void exception_handler_wrapper();
+            struct lisp_exception_frame *f = top_exception_frame;
+            if (f && f != (void*)-1 && f->handler == (void*)exception_handler_wrapper)
+                top_exception_frame = f->next_frame;
+        }
+
         /* Can't pull stack start from fs:4 or fs:8 or whatever,
          * because that's only what currently has memory behind
          * it from being used, so do a quick VirtualQuery() and
@@ -139,7 +152,7 @@ os_restore_fp_control(os_context_t *context)
 os_context_register_t *
 os_context_float_register_addr(os_context_t *context, int offset)
 {
-    return (os_context_register_t*)&context->win32_context->FloatSave.RegisterArea[offset];
+    return (os_context_register_t*)&context->win32_context->FloatSave.RegisterArea[offset * 10];
 }
 void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
