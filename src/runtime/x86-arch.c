@@ -208,6 +208,18 @@ restore_breakpoint_from_single_step(os_context_t * context)
     *(single_stepping-2) = single_step_save2;
     *(single_stepping-1) = single_step_save3;
 #else
+    /* A breakpoint occupies two bytes (INT3 followed by the trap code), so
+     * it can't be re-installed while PC sits on its second byte, which is
+     * where a one-byte displaced instruction (e.g. the PUSH EAX that starts
+     * the win32 thread-local access idiom) leaves us. Trace one more
+     * instruction and try again then. Set TF again rather than assuming it
+     * survived: Windows clears it in the delivered context, while on Linux
+     * it is still set (which is what the clear below is for). */
+    if (((char *)OS_CONTEXT_PC(context) > (char *)single_stepping) &&
+        ((char *)OS_CONTEXT_PC(context) <= (char *)single_stepping + BREAKPOINT_WIDTH)) {
+        *os_context_flags_addr(context) |= 0x100;
+        return;
+    }
     *os_context_flags_addr(context) &= ~0x100;
 #endif
     /* Re-install the breakpoint if possible. */
