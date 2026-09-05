@@ -293,6 +293,29 @@
     (move block esp-tn)
     (loadw temp uwp sap-pointer-slot other-pointer-lowtag)
     (storew temp block unwind-block-uwp-slot)
+
+    #+win32
+    ;; The UNWIND assembly routine passes this slot to RtlUnwind as
+    ;; TargetFrame, so it must name the SEH registration record that
+    ;; SURROUNDS the frame we are unwinding to -- not the one current at
+    ;; the point of this call, which is inside the region being unwound
+    ;; and would leave the intervening UWP handlers unrun.
+    ;; SET-UNWIND-PROTECT installs &BLOCK[next-seh-frame-slot] as the SEH
+    ;; frame for a UWP block, so derive it from UWP the same way. TEMP
+    ;; still holds that block (0 if the target has no enclosing UWP).
+    (let ((null-uwp (gen-label))
+          (seh-done (gen-label)))
+      (inst test temp temp)
+      (inst jmp :z null-uwp)
+      (inst lea temp (make-ea :dword :base temp
+                              :disp (* unwind-block-next-seh-frame-slot
+                                       n-word-bytes)))
+      (inst jmp seh-done)
+      (emit-label null-uwp)
+      (inst mov temp (make-ea :dword :disp 0) :fs)
+      (emit-label seh-done)
+      (storew temp block unwind-block-next-seh-frame-slot))
+
     (loadw temp ofp sap-pointer-slot other-pointer-lowtag)
     (storew temp block unwind-block-cfp-slot)
 
