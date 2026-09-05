@@ -544,7 +544,7 @@ void sb_nanosleep_float(float seconds) {
 #endif
 
 /* 64-bit timeval */
-#if !defined(LISP_FEATURE_64_BIT) || defined (LISP_FEATURE_NETBSD)
+#if (!defined(LISP_FEATURE_64_BIT) && !defined(LISP_FEATURE_WIN32)) || defined (LISP_FEATURE_NETBSD)
 /* These thin wrappers are needed due to "linker rewriting"
  * acording to git revision 9304704f68 */
 int sb_getrusage(int who, struct rusage *rusage)
@@ -612,6 +612,11 @@ double sb_hypot (double x, double y) {
 }
 double sb_hypotf (double x, double y) {
     return hypotf(x, y);
+}
+/* msvcrt.dll's pow() flushes denormal results to zero; going through the
+ * runtime binds to the toolchain's libm implementation instead. */
+double sb_pow (double x, double y) {
+    return pow(x, y);
 }
 #endif
 
