@@ -13,21 +13,25 @@
 
 ;;;; allocation helpers
 
-(defun generate-stack-overflow-check (vop size)
+;;; TEMP must be a register that is free at this point; it is only used on
+;;; win32, where FS: addresses the TEB rather than the thread structure, so
+;;; the thread base has to be fetched into a register first (see WITH-TLS-EA).
+(defun generate-stack-overflow-check (vop size temp)
+  (declare (ignorable temp))
   (let ((overflow (generate-error-code
                    vop
                    'stack-allocated-object-overflows-stack-error
                    size)))
-        (inst sub esp-tn size)
-        (inst cmp esp-tn
-              #-sb-thread
-              (make-ea-for-symbol-value *control-stack-start* :dword)
-              #+sb-thread
-              (make-ea :dword :disp (* 4 thread-control-stack-start-slot))
-              #+sb-thread :fs)
-        ;; avoid clearing condition codes
-        (inst lea esp-tn (make-ea :dword :base esp-tn :index size))
-        (inst jmp :le overflow)))
+    (inst sub esp-tn size)
+    #-sb-thread
+    (inst cmp esp-tn (make-ea-for-symbol-value *control-stack-start* :dword))
+    #+sb-thread
+    (with-tls-ea (ea :base temp :disp-type :constant
+                     :disp (* 4 thread-control-stack-start-slot))
+      (inst cmp esp-tn ea :maybe-fs))
+    ;; avoid clearing condition codes
+    (inst lea esp-tn (make-ea :dword :base esp-tn :index size))
+    (inst jmp :le overflow)))
 
 ;;; Allocation within alloc_region (which is thread local) can be done
 ;;; inline.  If the alloc_region is overflown allocation is done by
@@ -316,7 +320,7 @@
     (move ecx words)
     (inst shr ecx n-fixnum-tag-bits)
     (when (sb-c::make-vector-check-overflow-p node)
-      (generate-stack-overflow-check vop bytes))
+      (generate-stack-overflow-check vop bytes result))
     (stack-allocation result bytes other-pointer-lowtag)
     (inst cld)
     (sc-case type
