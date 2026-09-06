@@ -267,7 +267,13 @@ fractional bits."
 ;; with a sufficiently accurate value of pi that the reduced argument
 ;; is correct to nearly double-float precision even for arguments of
 ;; very large absolute value.
-(with-test (:name (:range-reduction :precise-pi))
+;; msvcrt's sin and cos reduce with the 66-bit pi the x87 fsin/fcos carry,
+;; so a large argument comes back a few ulps out. glibc reduces properly, and
+;; x86-64 Windows gets a different libm (UCRT), so this is specific to the
+;; combination. SBCL calls the C library here -- see DEF-MATH-RTN in irrat.lisp
+;; -- rather than emitting fsin itself.
+(with-test (:name (:range-reduction :precise-pi)
+            :fails-on (and :win32 :x86))
   (let ((rational-pi-half (/ (pi-gauss-legendre 2200) 2)))
     (labels ((round-pi-half (x)
                "Return two values as if (ROUND X (/ PI 2)) was called
