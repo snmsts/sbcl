@@ -1249,6 +1249,42 @@ carry_frame_pointer(os_context_register_t default_value)
     return bp ? bp : default_value;
 }
 
+#ifdef LISP_FEATURE_X86
+/* RtlDispatchException validates the handler of every SEH registration it
+ * walks, and refuses one that lies outside a loaded image unless the process
+ * permits execute dispatch -- which on current Windows it does not, whatever
+ * --disable-nxcompat says. SET-UNWIND-PROTECT used to register the
+ * uwp-seh-handler assembly routine directly, and that lives in a Lisp code
+ * object, so as soon as an unwind-protect was in scope the next access
+ * violation was simply not dispatched and the process died with no
+ * diagnostic. Register this instead: it lives in the image, and only the
+ * unwinding case needs to reach Lisp at all.
+ *
+ * Genesis stores the address of the UWP-SEH-HANDLER routine in the static
+ * symbol of the same name (see *RUNTIME-ASM-ROUTINES* in x86/parms.lisp),
+ * so it is available in a cold core as well as a saved one, before any
+ * Lisp code has run. */
+EXCEPTION_DISPOSITION
+uwp_seh_trampoline(EXCEPTION_RECORD *exception_record,
+                   struct lisp_exception_frame *frame,
+                   CONTEXT *win32_context,
+                   void *dispatcher_context)
+{
+    if (!(exception_record->ExceptionFlags & (EH_UNWINDING | EH_EXIT_UNWIND)))
+        return ExceptionContinueSearch;
+    return ((EXCEPTION_DISPOSITION (*)(EXCEPTION_RECORD *,
+                                       struct lisp_exception_frame *,
+                                       CONTEXT *, void *))
+            SYMBOL(UWP_SEH_HANDLER)->value)(exception_record, frame,
+                                            win32_context, dispatcher_context);
+}
+
+/* SET-UNWIND-PROTECT loads the handler address out of here. It cannot name
+ * the function through a :FOREIGN fixup: that resolves to the alien linkage
+ * table entry, which is outside the image too. */
+void *uwp_seh_trampoline_addr = (void*)uwp_seh_trampoline;
+#endif
+
 void
 wos_install_interrupt_handlers
 (struct lisp_exception_frame __attribute__((__unused__)) *handler)

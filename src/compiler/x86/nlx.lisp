@@ -114,8 +114,16 @@
   (:generator 7
     #+win32
     (progn
-      (storew (make-fixup 'uwp-seh-handler :assembly-routine)
-              uwp unwind-block-seh-frame-handler-slot)
+      ;; The handler has to lie inside a loaded image or RtlDispatchException
+      ;; will not call it while DEP is on (see uwp_seh_trampoline in
+      ;; win32-os.c). The runtime keeps the trampoline's address in a
+      ;; variable: a :FOREIGN fixup for the function would resolve to the
+      ;; alien linkage table entry, which is outside the image as well.
+      (inst mov seh-frame
+            (make-ea :dword
+                     :disp (make-fixup "uwp_seh_trampoline_addr" :foreign-dataref)))
+      (inst mov seh-frame (make-ea :dword :base seh-frame))
+      (storew seh-frame uwp unwind-block-seh-frame-handler-slot)
       (inst lea seh-frame
             (object-slot-ea uwp
                                      unwind-block-next-seh-frame-slot 0))

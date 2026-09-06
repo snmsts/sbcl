@@ -203,6 +203,14 @@
 ;;;     Note these spaces grow from low to high addresses.
 (defvar *binding-stack-pointer*)
 
+;;; uwp_seh_trampoline in the runtime hands unwinds to the UWP-SEH-HANDLER
+;;; assembly routine and has to find it before any Lisp has run, in a cold
+;;; core as much as a saved one. Genesis stores the routine's address in a
+;;; static symbol of the same name for it.
+#+win32
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *runtime-asm-routines* '(uwp-seh-handler)))
+
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
     *alien-stack-pointer*
@@ -224,7 +232,8 @@
      *fp-constant-l2t*
      *fp-constant-l2e*
      *fp-constant-lg2*
-     *fp-constant-ln2*)
+     *fp-constant-ln2*
+    ,@*runtime-asm-routines*)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+ `#(,@common-static-fdefns) #'equalp)
