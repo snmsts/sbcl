@@ -77,9 +77,14 @@
 ;;; (And I don't know much about math, but I don't think that's how percentages work)
 ;;;
 ;;; I don't remember what the problem is with PPC.
+;;; On win32 the allocation granularity is 64KB, so GENCGC-PAGE-BYTES --
+;;; and with it LARGE-OBJECT-SIZE, and so the argument count below -- is
+;;; sixteen times what it is on x86 elsewhere: 32768 rather than 2048.
+;;; The 32-bit default heap is 512MB either way, and register allocation
+;;; over a call with that many arguments exhausts it.
 (with-test (:name :no-list-on-large-object-pages
             :fails-on :sparc
-            :skipped-on (:or :mips :ppc :ppc64))
+            :skipped-on (:or :mips :ppc :ppc64 (:and :win32 :x86)))
   (let* ((fun (checked-compile
                '(lambda ()
                  (macrolet ((expand (n) `(list ,@(loop for i from 1 to n collect i))))
